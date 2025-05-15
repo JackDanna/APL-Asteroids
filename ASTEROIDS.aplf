@@ -1,9 +1,13 @@
-ASTEROIDS;frame_size;Conga;DRC;rc;srv;title;hr;_;LISTEN
-	;CON;ERR;TICK;WSU
-	;RENDER
+ASTEROIDS;frame_size;Conga;DRC;rc;srv;title;hr;_;LISTEN;obj;evt;dat;gui
+	;pos;ssz;sprite
+ ;CON;ERR;TICK;WSU
+	;RENDER;SETGUI;TERM;CLOSE;⎕IO
+
+⎕IO ← 0
+
 
 ⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝ STATE GOES HERE ⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝
-frame_size←640 480
+frame_size←640 480 ⋄ pos ← 320 240 ⋄ ssz ← 151 287 ⋄ sprite ← 'ship' ⋄ gui ← ''
 
 ⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝ STARTUP CODE ⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝
 'Conga'⎕CY'conga'
@@ -76,26 +80,76 @@ hr.HTML←_
 
 
 ⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝ STIMULI ⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝
-CON ERR TICK WSU←1+⍳4
+CON ERR TICK WSU XT ←1+⍳5
 LISTEN←{rc←⊃z←DRC.Wait srv 15
 	0≠rc:				ERR	⍝ Error in server
 	rc obj evt dat∘←z
-	'Connect'≡evt:			CON	⍝ Connection from GUI
+	'Connect'≡evt:			⍵+CON	⍝ Connection from GUI
+ 'Timeout'≡evt:   ⍵+TICK
+ 'Closed'≡evt:{
+        obj≡gui:  ⍵+XT
+                  ⍵
+  }⍵
+ 'WSUpgrade'≡evt: ⍵+WSU
+ 'Error'≡evt:     ⍵+ERR
+ ⎕SIGNAL 99
+
 	
 	⍝⍝⍝⍝⍝⍝ HANDLE REMAINING STIMULI HERE ⍝⍝⍝⍝⍝⍝⍝⍝
+}
+
+
+SETGUI←{
+gui∘←obj
+}
+
+TERM←{
+    gui∘←''
+}
+CLOSE← {
+     DRC.Close obj
 }
 
 ⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝ RESPONSES ⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝
 RENDER←{
 
 	⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝ YOU NEED RENDER CODE ⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝
+ msg    ←    ''
+ color  ←    '#FFFFFF'
+ diff   ←    '#FFFFFF'
+ score  ←    0
+ fire   ←     0
+ objs   ←     ,⊂(⊂sprite), pos, ssz
+
+ data←⎕JSON msg color diff score fire objs
 
 	1:_←DRC.Send gui (data 1 1)
 }
 
 ⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝ SEQUENCE ENUMERATION BEGINS ⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝⍝
 ∆_:→LISTEN ⎕LC
+∆_CON: SETGUI⍬ ⋄ →∆_CON_
+∆_ERR:         ⋄ →CLEANUP
+∆_TICK:        ⋄ →∆_
+∆_WSU: ∘∘∘     ⋄ →CLEANUP
+∆_XT:          ⋄ →CLEANUP
+
+∆_CON_: → LISTEN ⎕LC
+∆_CON_CON:        CLOSE⍬ ⋄ →∆_CON_
+∆_CON_ERR:         TERM⍬ ⋄ →CLEANUP
+∆_CON_TICK:              ⋄ → ∆_CON_
+∆_CON_WSU:       RENDER⍬ ⋄ → ∆_CON_WSU_
+∆_CON_XT:          TERM⍬ ⋄ →CLEANUP
+
+∆_CON_WSU_:→LISTEN ⎕LC
+∆_CON_WSU_CON:      CLOSE⍬  ⋄ →∆_CON_WSU_
+∆_CON_WSU_ERR:      TERM⍬   ⋄ →CLEANUP
+∆_CON_WSU_TICK:     RENDER⍬ ⋄ →∆_CON_WSU_
+∆_CON_WSU_WSU:      ○○○     ⋄ →CLEANUP
+∆_CON_WSU_XT:       TERM⍬   ⋄ →CLEANUP
+
 
 CLEANUP:
+ DRC.Close srv
  ⎕EX'DRC'
  ⎕EX'Conga'
